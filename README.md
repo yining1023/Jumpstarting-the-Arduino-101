@@ -1,5 +1,5 @@
 # Jumpstarting-the-Arduino-101
-This reppsitory holds all the code for projects from Jumpstarting the Arduino 101 book
+This repository holds all the code for projects from Jumpstarting the Arduino 101 book
 
 ## Chapter 2 Blinking an LED
 
