@@ -1,22 +1,3 @@
-/*
- * This example demonstrates using the pattern matching engine (CuriePME)
- * to classify streams of accelerometer data from CurieIMU.
- *
- * First, the sketch will prompt you to draw some letters in the air (just
- * imagine you are writing on an invisible whiteboard, using your board as the
- * pen), and the IMU data from these motions is used as training data for the
- * PME. Once training is finished, you can keep drawing letters and the PME
- * will try to guess which letter you are drawing.
- *
- * This example requires a button to be connected to digital pin 4
- * https://www.arduino.cc/en/Tutorial/Button
- *
- * NOTE: For best results, draw big letters, at least 1-2 feet tall.
- *
- * Copyright (c) 2016 Intel Corporation.  All rights reserved.
- * See license notice at end of file.
- */
-
 #include "CurieIMU.h"
 #include "CuriePME.h"
 #include <CurieBLE.h>
@@ -105,7 +86,7 @@ void loop ()
         Serial.print("Connected to central: ");
         // print the central's MAC address:
         Serial.println(central.address());
-        
+
         if (central.connected()) {
             /* Wait until button is pressed */
             while (digitalRead(buttonPin) == LOW) {
@@ -296,19 +277,3 @@ void trainLetters()
         delay(2000);
     }
 }
-
-/*
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
- */

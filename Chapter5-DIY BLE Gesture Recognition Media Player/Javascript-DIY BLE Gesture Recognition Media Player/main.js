@@ -1,14 +1,5 @@
-const serviceUuid = "19b10000-e8f2-537e-4f6c-d104768a1216"; // lowercase hex characters e.g. '00001234-0000-1000-8000-00805f9b34fb'
-const name = 'CuriePME';
-
-var bluetoothDevice;
-var characteristiPattern;
-
-var value;
-var letter = '';
-var index;
 var song;
-var texts = 'Waiting...';
+var displayText = 'Waiting...';
 
 var backgroundColors = ['#1DFFAD', '#0FE8E2'];
 
@@ -26,21 +17,28 @@ function setup() {
 }
 
 function draw() {
-  if (letter !== '') {
+  if (pattern !== '') {
     changeColors();
   }
-  text(texts, width / 2, height / 2);
+  text(displayText, width / 2, height / 2);
 }
 
 function changeColors() {
-  if (letter === 'A') {
-    index = 0;
-    texts = 'play';
-    if (!song.isPlaying()) song.play();
-  } else if (letter === 'B') {
-    index = 1;
-    texts = 'pause';
-    if (song.isPlaying()) song.pause();
+  // if pattern A is recognized, play the song
+  // else pause it
+  if (pattern === 'A') {
+    displayText = 'play';
+    background(backgroundColors[0]);
+    if (!song.isPlaying()) {
+      console.log('Playing Song...');
+      song.play();
+    }
+  } else if (pattern === 'B') {
+    displayText = 'pause';
+    background(backgroundColors[1]);
+    if (song.isPlaying()) {
+      console.log('Pausing Song...');
+      song.pause();
+    }
   }
-  background(backgroundColors[index]);
 }
