@@ -18,12 +18,12 @@ function setup() {
 
 function draw() {
   if (pattern !== '') {
-    changeColors();
+    patternMatched();
   }
   text(displayText, width / 2, height / 2);
 }
 
-function changeColors() {
+function patternMatched() {
   // if pattern A is recognized, play the song
   // else pause it
   if (pattern === 'A') {
