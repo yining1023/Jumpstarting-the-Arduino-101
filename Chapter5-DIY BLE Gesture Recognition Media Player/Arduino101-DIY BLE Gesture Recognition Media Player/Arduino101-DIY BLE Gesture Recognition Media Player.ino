@@ -1,3 +1,11 @@
+/*
+ * This example demonstrates using the pattern matching engine (CuriePME)
+ * to classify streams of accelerometer data from CurieIMU.
+ *
+ * It is based on the DrawingInTheAir Example by Intel Corporation.
+ *
+ */
+
 #include "CurieIMU.h"
 #include "CuriePME.h"
 #include <CurieBLE.h>
@@ -6,7 +14,6 @@ BLEPeripheral blePeripheral;
 BLEService customService("19B10000-E8F2-537E-4F6C-D104768A1216");
 
 BLEUnsignedCharCharacteristic CharacteristicPattern("4227f3b1-d6a2-4fb2-a916-3bee580a9c84", BLERead | BLENotify);
-
 
 
 /*  This controls how many times a letter must be drawn during training.
@@ -48,76 +55,76 @@ char letter;
 
 void setup()
 {
-    Serial.begin(9600);
+  Serial.begin(9600);
 
-    pinMode(buttonPin, INPUT);
-    pinMode(ledPin, OUTPUT);
+  pinMode(buttonPin, INPUT);
+  pinMode(ledPin, OUTPUT);
 
-    // setup ble
-    blePeripheral.setLocalName("CuriePME");
-    blePeripheral.setAdvertisedServiceUuid(customService.uuid());
-    blePeripheral.addAttribute(customService);
-    blePeripheral.addAttribute(CharacteristicPattern);
+  // setup ble
+  blePeripheral.setLocalName("CuriePME");
+  blePeripheral.setAdvertisedServiceUuid(customService.uuid());
+  blePeripheral.addAttribute(customService);
+  blePeripheral.addAttribute(CharacteristicPattern);
 
-    CharacteristicPattern.setValue('0');
-    blePeripheral.begin();
+  CharacteristicPattern.setValue('0');
+  blePeripheral.begin();
 
-    /* Start the IMU (Intertial Measurement Unit), enable the accelerometer */
-    CurieIMU.begin(ACCEL);
+  /* Start the IMU (Intertial Measurement Unit), enable the accelerometer */
+  CurieIMU.begin(ACCEL);
 
-    /* Start the PME (Pattern Matching Engine) */
-    CuriePME.begin();
+  /* Start the PME (Pattern Matching Engine) */
+  CuriePME.begin();
 
-    CurieIMU.setAccelerometerRate(sampleRateHZ);
-    CurieIMU.setAccelerometerRange(2);
+  CurieIMU.setAccelerometerRate(sampleRateHZ);
+  CurieIMU.setAccelerometerRange(2);
 
-    while(!Serial);
-    trainLetters();
-    Serial.println("Training complete. Now, make a gesture (remember to ");
-    Serial.println("hold the button) and see if the PME can classify them.");
-    Serial.println("Use another ble device to connect to Arduino101 first");
+  while(!Serial);
+  trainLetters();
+  Serial.println("Training complete. Now, make a gesture (remember to ");
+  Serial.println("hold the button) and see if the PME can classify them.");
+  Serial.println("Use another ble device to connect to Arduino101 first");
 }
 
 void loop ()
 {
-    // ble
-    BLECentral central = blePeripheral.central();
-    if (central) {
-        Serial.print("Connected to central: ");
-        // print the central's MAC address:
-        Serial.println(central.address());
+  // ble
+  BLECentral central = blePeripheral.central();
 
-        if (central.connected()) {
-            /* Wait until button is pressed */
-            while (digitalRead(buttonPin) == LOW) {
-              digitalWrite(ledPin, LOW);
-            }
-            readVectorFromIMUTest(vector);
-        }
+  if (digitalRead(buttonPin) == LOW) {
+    digitalWrite(ledPin, LOW);
+  }
+  else if (central) {
+    Serial.print("Connected to central: ");
+    // print the central's MAC address:
+    Serial.println(central.address());
+
+    if (central.connected()) {
+      readVectorFromIMUTest(vector);
     }
+  }
 }
 
 /* Simple "moving average" filter, removes low noise and other small
  * anomalies, with the effect of smoothing out the data stream. */
 byte getAverageSample(byte samples[], unsigned int num, unsigned int pos,
-                   unsigned int step)
+           unsigned int step)
 {
-    unsigned int ret;
-    unsigned int size = step * 2;
+  unsigned int ret;
+  unsigned int size = step * 2;
 
-    if (pos < (step * 3) || pos > (num * 3) - (step * 3)) {
-        ret = samples[pos];
-    } else {
-        ret = 0;
-        pos -= (step * 3);
-        for (unsigned int i = 0; i < size; ++i) {
-            ret += samples[pos - (3 * i)];
-        }
-
-        ret /= size;
+  if (pos < (step * 3) || pos > (num * 3) - (step * 3)) {
+    ret = samples[pos];
+  } else {
+    ret = 0;
+    pos -= (step * 3);
+    for (unsigned int i = 0; i < size; ++i) {
+      ret += samples[pos - (3 * i)];
     }
 
-    return (byte)ret;
+    ret /= size;
+  }
+
+  return (byte)ret;
 }
 
 /* We need to compress the stream of raw accelerometer data into 128 bytes, so
@@ -141,139 +148,139 @@ byte getAverageSample(byte samples[], unsigned int num, unsigned int pos,
  *    and have some semblance of the original pattern. */
 void undersample(byte samples[], int numSamples, byte vector[])
 {
-    unsigned int vi = 0;
-    unsigned int si = 0;
-    unsigned int step = numSamples / samplesPerVector;
-    unsigned int remainder = numSamples - (step * samplesPerVector);
+  unsigned int vi = 0;
+  unsigned int si = 0;
+  unsigned int step = numSamples / samplesPerVector;
+  unsigned int remainder = numSamples - (step * samplesPerVector);
 
-    /* Centre sample window */
-    samples += (remainder / 2) * 3;
-    for (unsigned int i = 0; i < samplesPerVector; ++i) {
-        for (unsigned int j = 0; j < 3; ++j) {
-            vector[vi + j] = getAverageSample(samples, numSamples, si + j, step);
-        }
-
-        si += (step * 3);
-        vi += 3;
+  /* Centre sample window */
+  samples += (remainder / 2) * 3;
+  for (unsigned int i = 0; i < samplesPerVector; ++i) {
+    for (unsigned int j = 0; j < 3; ++j) {
+      vector[vi + j] = getAverageSample(samples, numSamples, si + j, step);
     }
+
+    si += (step * 3);
+    vi += 3;
+  }
 }
 
 void readVectorFromIMUTest(byte vector[])
 {
-    byte accel[sensorBufSize];
-    int raw[3];
+  byte accel[sensorBufSize];
+  int raw[3];
 
-    unsigned int samples = 0;
-    unsigned int i = 0;
+  unsigned int samples = 0;
+  unsigned int i = 0;
 
-    /* While button is being held... */
-    while (digitalRead(buttonPin) == HIGH) {
-        digitalWrite(ledPin, HIGH);
-        if (CurieIMU.dataReady()) {
-            CurieIMU.readAccelerometer(raw[0], raw[1], raw[2]);
+  /* While button is being held... */
+  while (digitalRead(buttonPin) == HIGH) {
+    digitalWrite(ledPin, HIGH);
+    if (CurieIMU.dataReady()) {
+      CurieIMU.readAccelerometer(raw[0], raw[1], raw[2]);
 
-            /* Map raw values to 0-255 */
-            accel[i] = (byte) map(raw[0], IMULow, IMUHigh, 0, 255);
-            accel[i + 1] = (byte) map(raw[1], IMULow, IMUHigh, 0, 255);
-            accel[i + 2] = (byte) map(raw[2], IMULow, IMUHigh, 0, 255);
+      /* Map raw values to 0-255 */
+      accel[i] = (byte) map(raw[0], IMULow, IMUHigh, 0, 255);
+      accel[i + 1] = (byte) map(raw[1], IMULow, IMUHigh, 0, 255);
+      accel[i + 2] = (byte) map(raw[2], IMULow, IMUHigh, 0, 255);
 
-            i += 3;
-            ++samples;
+      i += 3;
+      ++samples;
 
-            /* If there's not enough room left in the buffers
-            * for the next read, then we're done */
-            if (i + 3 > sensorBufSize) {
-                break;
-            }
-        }
+      /* If there's not enough room left in the buffers
+      * for the next read, then we're done */
+      if (i + 3 > sensorBufSize) {
+        break;
+      }
     }
+  }
 
-    undersample(accel, samples, vector);
-    classify(vector, category, letter);
+  undersample(accel, samples, vector);
+  classify(vector, category, letter);
 }
 
 void classify(byte vector[], unsigned int category, char letter)
 {
-    /* Use the PME to classify the vector, i.e. return a category from 1-26, representing a letter from A-Z */
-    category = CuriePME.classify(vector, vectorNumBytes);
-    Serial.println("get category: ");
-    Serial.println(category);
+  /* Use the PME to classify the vector, i.e. return a category from 1-26, representing a letter from A-Z */
+  category = CuriePME.classify(vector, vectorNumBytes);
+  Serial.println("get category: ");
+  Serial.println(category);
 
-    if (category == CuriePME.noMatch) {
-        Serial.println("Don't recognise that one-- try again.");
-        CharacteristicPattern.setValue('0');
-    } else {
-        letter = category + upperStart;
-        Serial.println("The letter is:");
-        Serial.println(letter);
-        CharacteristicPattern.setValue(letter);
-    }
+  if (category == CuriePME.noMatch) {
+    Serial.println("Don't recognise that one-- try again.");
+    CharacteristicPattern.setValue('0');
+  } else {
+    letter = category + upperStart;
+    Serial.println("The letter is:");
+    Serial.println(letter);
+    CharacteristicPattern.setValue(letter);
+  }
 }
 
 void readVectorFromIMULearn(byte vector[])
 {
-    byte accel[sensorBufSize];
-    int raw[3];
+  byte accel[sensorBufSize];
+  int raw[3];
 
-    unsigned int samples = 0;
-    unsigned int i = 0;
+  unsigned int samples = 0;
+  unsigned int i = 0;
 
-    /* Wait until button is pressed */
-    while (digitalRead(buttonPin) == LOW) {
-      digitalWrite(ledPin, LOW);
+  /* Wait until button is pressed */
+  while (digitalRead(buttonPin) == LOW) {
+    digitalWrite(ledPin, LOW);
+  }
+
+  /* While button is being held... */
+  while (digitalRead(buttonPin) == HIGH) {
+    digitalWrite(ledPin, HIGH);
+    if (CurieIMU.dataReady()) {
+      CurieIMU.readAccelerometer(raw[0], raw[1], raw[2]);
+
+      /* Map raw values to 0-255 */
+      accel[i] = (byte) map(raw[0], IMULow, IMUHigh, 0, 255);
+      accel[i + 1] = (byte) map(raw[1], IMULow, IMUHigh, 0, 255);
+      accel[i + 2] = (byte) map(raw[2], IMULow, IMUHigh, 0, 255);
+
+      i += 3;
+      ++samples;
+
+      /* If there's not enough room left in the buffers
+      * for the next read, then we're done */
+      if (i + 3 > sensorBufSize) {
+        break;
+      }
     }
-
-    /* While button is being held... */
-    while (digitalRead(buttonPin) == HIGH) {
-        digitalWrite(ledPin, HIGH);
-        if (CurieIMU.dataReady()) {
-            CurieIMU.readAccelerometer(raw[0], raw[1], raw[2]);
-
-            /* Map raw values to 0-255 */
-            accel[i] = (byte) map(raw[0], IMULow, IMUHigh, 0, 255);
-            accel[i + 1] = (byte) map(raw[1], IMULow, IMUHigh, 0, 255);
-            accel[i + 2] = (byte) map(raw[2], IMULow, IMUHigh, 0, 255);
-
-            i += 3;
-            ++samples;
-
-            /* If there's not enough room left in the buffers
-            * for the next read, then we're done */
-            if (i + 3 > sensorBufSize) {
-                break;
-            }
-        }
-    }
-    undersample(accel, samples, vector);
+  }
+  undersample(accel, samples, vector);
 }
 
 void trainLetter(char letter, unsigned int repeat)
 {
-    unsigned int i = 0;
+  unsigned int i = 0;
 
-    while (i < repeat) {
-        byte vector[vectorNumBytes];
+  while (i < repeat) {
+    byte vector[vectorNumBytes];
 
-        if (i) Serial.println("And again...");
+    if (i) Serial.println("And again...");
 
-        readVectorFromIMULearn(vector);
-        CuriePME.learn(vector, vectorNumBytes, letter - upperStart);
+    readVectorFromIMULearn(vector);
+    CuriePME.learn(vector, vectorNumBytes, letter - upperStart);
 
-        Serial.println("Got it!");
-        delay(1000);
-        ++i;
-    }
+    Serial.println("Got it!");
+    delay(1000);
+    ++i;
+  }
 }
 
 void trainLetters()
 {
-    for (char i = trainingStart; i <= trainingEnd; ++i) {
-        Serial.print("Hold down the button and make a gesture or '");
-        Serial.print(String(i) + "' in the air. Release the button as soon ");
-        Serial.println("as you are done.");
+  for (char i = trainingStart; i <= trainingEnd; ++i) {
+    Serial.print("Hold down the button and make a gesture or '");
+    Serial.print(String(i) + "' in the air. Release the button as soon ");
+    Serial.println("as you are done.");
 
-        trainLetter(i, trainingReps);
-        Serial.println("OK, finished with this gesture.");
-        delay(2000);
-    }
+    trainLetter(i, trainingReps);
+    Serial.println("OK, finished with this gesture.");
+    delay(2000);
+  }
 }
