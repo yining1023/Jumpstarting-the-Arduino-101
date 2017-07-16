@@ -3,7 +3,7 @@
  * to classify streams of accelerometer data from CurieIMU.
  *
  * It is based on the DrawingInTheAir Example by Intel Corporation.
- *
+ * 
  */
 
 #include "CurieIMU.h"
@@ -13,8 +13,10 @@
 BLEPeripheral blePeripheral;
 BLEService customService("19B10000-E8F2-537E-4F6C-D104768A1216");
 
-BLEUnsignedCharCharacteristic CharacteristicPattern("4227f3b1-d6a2-4fb2-a916-3bee580a9c84", BLERead | BLENotify);
-
+BLEUnsignedCharCharacteristic CharacteristicPattern(
+  "4227f3b1-d6a2-4fb2-a916-3bee580a9c84", 
+  BLERead | BLENotify
+);
 
 /*  This controls how many times a letter must be drawn during training.
  *  Any higher than 4, and you may not have enough neurons for all 26 letters
@@ -52,6 +54,7 @@ const int IMUHigh = 32767;
 byte vector[vectorNumBytes];
 unsigned int category;
 char letter;
+char prevLetter;
 
 void setup()
 {
@@ -79,27 +82,34 @@ void setup()
   CurieIMU.setAccelerometerRange(2);
 
   while(!Serial);
-  trainLetters();
+  beginTraining();
   Serial.println("Training complete. Now, make a gesture (remember to ");
-  Serial.println("hold the button) and see if the PME can classify them.");
-  Serial.println("Use another ble device to connect to Arduino101 first");
+  Serial.println("hold the button) and see if the PME can classify it.");
+  Serial.println("Use another BLE device to connect to Arduino101 first");
 }
 
 void loop ()
 {
-  // ble
   BLECentral central = blePeripheral.central();
 
-  if (digitalRead(buttonPin) == LOW) {
-    digitalWrite(ledPin, LOW);
-  }
-  else if (central) {
-    Serial.print("Connected to central: ");
-    // print the central's MAC address:
-    Serial.println(central.address());
+  // turn off LED by default
+  digitalWrite(ledPin, LOW);
 
-    if (central.connected()) {
-      readVectorFromIMUTest(vector);
+  // if button is pressed, read and classify the
+  // accelerometer vector from the IMU
+  if(digitalRead(buttonPin) == HIGH) {
+    readVectorFromIMU(vector);
+    classify(vector);
+  }
+
+  // if a change in the gesture or letter is 
+  // detected, update the characteristic
+  if (prevLetter != letter) {
+    if(central) {
+      if (central.connected()) {
+        CharacteristicPattern.setValue(letter); 
+        prevLetter = letter;
+      }
     }
   }
 }
@@ -165,59 +175,38 @@ void undersample(byte samples[], int numSamples, byte vector[])
   }
 }
 
-void readVectorFromIMUTest(byte vector[])
+void beginTraining()
 {
-  byte accel[sensorBufSize];
-  int raw[3];
+  for (char i = trainingStart; i <= trainingEnd; ++i) {
+    Serial.print("Hold down the button and make a gesture or '");
+    Serial.print(String(i) + "' in the air. Release the button as soon ");
+    Serial.println("as you are done.");
 
-  unsigned int samples = 0;
+    trainGesture(i, trainingReps);
+    Serial.println("OK, finished with this gesture.");
+    delay(2000);
+  }
+}
+
+void trainGesture(char letter, unsigned int repeat)
+{
   unsigned int i = 0;
 
-  /* While button is being held... */
-  while (digitalRead(buttonPin) == HIGH) {
-    digitalWrite(ledPin, HIGH);
-    if (CurieIMU.dataReady()) {
-      CurieIMU.readAccelerometer(raw[0], raw[1], raw[2]);
+  while (i < repeat) {
+    byte vector[vectorNumBytes];
 
-      /* Map raw values to 0-255 */
-      accel[i] = (byte) map(raw[0], IMULow, IMUHigh, 0, 255);
-      accel[i + 1] = (byte) map(raw[1], IMULow, IMUHigh, 0, 255);
-      accel[i + 2] = (byte) map(raw[2], IMULow, IMUHigh, 0, 255);
+    if (i) Serial.println("And again...");
 
-      i += 3;
-      ++samples;
+    readVectorFromIMU(vector);
+    CuriePME.learn(vector, vectorNumBytes, letter - upperStart);
 
-      /* If there's not enough room left in the buffers
-      * for the next read, then we're done */
-      if (i + 3 > sensorBufSize) {
-        break;
-      }
-    }
-  }
-
-  undersample(accel, samples, vector);
-  classify(vector, category, letter);
-}
-
-void classify(byte vector[], unsigned int category, char letter)
-{
-  /* Use the PME to classify the vector, i.e. return a category from 1-26, representing a letter from A-Z */
-  category = CuriePME.classify(vector, vectorNumBytes);
-  Serial.println("get category: ");
-  Serial.println(category);
-
-  if (category == CuriePME.noMatch) {
-    Serial.println("Don't recognise that one-- try again.");
-    CharacteristicPattern.setValue('0');
-  } else {
-    letter = category + upperStart;
-    Serial.println("The letter is:");
-    Serial.println(letter);
-    CharacteristicPattern.setValue(letter);
+    Serial.println("Got it!");
+    delay(1000);
+    ++i;
   }
 }
 
-void readVectorFromIMULearn(byte vector[])
+void readVectorFromIMU(byte vector[])
 {
   byte accel[sensorBufSize];
   int raw[3];
@@ -254,33 +243,20 @@ void readVectorFromIMULearn(byte vector[])
   undersample(accel, samples, vector);
 }
 
-void trainLetter(char letter, unsigned int repeat)
+void classify(byte vector[])
 {
-  unsigned int i = 0;
-
-  while (i < repeat) {
-    byte vector[vectorNumBytes];
-
-    if (i) Serial.println("And again...");
-
-    readVectorFromIMULearn(vector);
-    CuriePME.learn(vector, vectorNumBytes, letter - upperStart);
-
-    Serial.println("Got it!");
-    delay(1000);
-    ++i;
+  /* Use the PME to classify the vector, i.e. return a category from 1-26, representing a letter from A-Z */
+  category = CuriePME.classify(vector, vectorNumBytes);
+  Serial.println("get category: ");
+  Serial.println(category);
+  prevLetter = letter;
+  if (category == CuriePME.noMatch) {
+    Serial.println("Don't recognise that one-- try again.");
+    letter = '0';
+  } else {
+    letter = category + upperStart;
+    Serial.println("The gesture is:");
+    Serial.println(letter);
   }
 }
 
-void trainLetters()
-{
-  for (char i = trainingStart; i <= trainingEnd; ++i) {
-    Serial.print("Hold down the button and make a gesture or '");
-    Serial.print(String(i) + "' in the air. Release the button as soon ");
-    Serial.println("as you are done.");
-
-    trainLetter(i, trainingReps);
-    Serial.println("OK, finished with this gesture.");
-    delay(2000);
-  }
-}
