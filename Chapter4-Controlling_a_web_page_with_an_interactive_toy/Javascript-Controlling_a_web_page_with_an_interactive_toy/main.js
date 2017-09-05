@@ -104,6 +104,6 @@ function playSound() {
 function disconnect() {
   if (bluetoothDevice && bluetoothDevice.gatt) {
     bluetoothDevice.gatt.disconnect();
-    console.log('Discoonected');
+    console.log('Disconnected');
   }
 }
