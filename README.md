@@ -10,4 +10,4 @@ This repository holds all the code for projects from Jumpstarting the Arduino 10
 [demo](https://youtu.be/aS4TPNicFsA)
 
 ## Chapter 5 DIY BLE Gesture Recognition Media Player
-[demo](https://youtu.be/aS4TPNicFsA)
+[demo](https://youtu.be/CuWK2fc2dCw)
